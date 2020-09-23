@@ -17,6 +17,8 @@ import br.com.devdojo.error.ResourceNotFoundException;
 import br.com.devdojo.model.Student;
 import br.com.devdojo.repository.StudentRepository;
 
+import javax.validation.Valid;
+
 @RestController
 @RequestMapping("/students")
 public class StudentController {
@@ -43,7 +45,7 @@ public class StudentController {
 
 	@PostMapping
 	@Transactional(rollbackFor = Exception.class)
-	public ResponseEntity<?> save(@RequestBody Student student) {
+	public ResponseEntity<?> save(@Valid @RequestBody Student student) {
 		return new ResponseEntity<>(studentDao.save(student), HttpStatus.CREATED);
 
 	}
