@@ -1,13 +1,12 @@
 package br.com.devdojo.repository;
 
-import java.util.List;
-
+import br.com.devdojo.model.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import br.com.devdojo.model.Student;
+import java.util.List;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
 
-	List<Student> findByNameIgnoreCaseContaining(String name);
+    List<Student> findByNameIgnoreCaseContaining(String name);
 
 }
