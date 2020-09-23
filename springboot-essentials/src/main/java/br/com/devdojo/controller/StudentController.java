@@ -24,7 +24,7 @@ public class StudentController {
 
     @GetMapping("/protected/students")
     public ResponseEntity<?> listAll(Pageable pageable) {
-        return new ResponseEntity<>(studentDao.findAll(), HttpStatus.OK);
+        return new ResponseEntity<>(studentDao.findAll(pageable), HttpStatus.OK);
     }
 
     @GetMapping("/protected/students/{id}")
