@@ -16,18 +16,18 @@ import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 
 @RestController
-@RequestMapping("/students")
+@RequestMapping("/v1")
 public class StudentController {
 
     @Autowired
     private StudentRepository studentDao;
 
-    @GetMapping
+    @GetMapping("/protected/students")
     public ResponseEntity<?> listAll(Pageable pageable) {
         return new ResponseEntity<>(studentDao.findAll(pageable), HttpStatus.OK);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/protected/students/{id}")
     public ResponseEntity<?> getStudentById(@PathVariable("id") Long id, @AuthenticationPrincipal UserDetails userDetails) {
         System.out.println(userDetails);
         verifyIfStudentExists(id);
@@ -35,27 +35,27 @@ public class StudentController {
         return new ResponseEntity<>(student, HttpStatus.OK);
     }
 
-    @GetMapping("/findByName/{name}")
+    @GetMapping("/protected/students/findByName/{name}")
     public ResponseEntity<?> findStudentsByName(@PathVariable String name) {
         return new ResponseEntity<>(studentDao.findByNameIgnoreCaseContaining(name), HttpStatus.OK);
     }
 
-    @PostMapping
+    @PostMapping("/admin/students")
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<?> save(@Valid @RequestBody Student student) {
         return new ResponseEntity<>(studentDao.save(student), HttpStatus.CREATED);
 
     }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/admin/students/{id}")
+//    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         verifyIfStudentExists(id);
         studentDao.deleteById(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
-    @PutMapping
+    @PutMapping("/admin/students")
     public ResponseEntity<?> update(@RequestBody Student student) {
         verifyIfStudentExists(student.getId());
         studentDao.save(student);
