@@ -4,6 +4,7 @@ import br.com.devdojo.error.ErrorDetails;
 import br.com.devdojo.error.ResourceNotFoundDetails;
 import br.com.devdojo.error.ResourceNotFoundException;
 import br.com.devdojo.error.ValidationErrorDetails;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -70,6 +71,20 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(errorDetails, headers, status);
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<?> handlePropertyReferenceException(PropertyReferenceException ex) {
+        ResourceNotFoundDetails resourceNotFoundDetails = ResourceNotFoundDetails.Builder
+                .newBuilder()
+                .timestamp(new Date().getTime())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .title("Internal Server Error")
+                .detail(ex.getMessage())
+                .developerMessage(ex.getClass().getName())
+                .build();
+
+        return new ResponseEntity<>(resourceNotFoundDetails, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
 }
