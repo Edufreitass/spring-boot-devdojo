@@ -37,22 +37,27 @@ public class StudentController {
 		return new ResponseEntity<>(student, HttpStatus.OK);
 	}
 
+	@GetMapping("/findByName/{name}")
+	public ResponseEntity<?> findStudentsByName(@PathVariable String name) {
+		return new ResponseEntity<>(studentDao.findByNameIgnoreCaseContaining(name), HttpStatus.OK);
+	}
+
 	@PostMapping
 	public ResponseEntity<?> save(@RequestBody Student student) {
-		return new ResponseEntity<>(studentDao.save(student), HttpStatus.OK);
+		return new ResponseEntity<>(studentDao.save(student), HttpStatus.CREATED);
 
 	}
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<?> delete(@PathVariable Long id) {
 		studentDao.deleteById(id);
-		return new ResponseEntity<>(HttpStatus.OK);
+		return new ResponseEntity<>(HttpStatus.NO_CONTENT);
 	}
 
 	@PutMapping
 	public ResponseEntity<?> update(@RequestBody Student student) {
 		studentDao.save(student);
-		return new ResponseEntity<>(HttpStatus.OK);
+		return new ResponseEntity<>(HttpStatus.NO_CONTENT);
 	}
 
 }

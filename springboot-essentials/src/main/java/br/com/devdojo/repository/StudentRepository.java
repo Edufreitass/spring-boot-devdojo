@@ -8,6 +8,6 @@ import br.com.devdojo.model.Student;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
 
-	List<Student> findByName(String name);
+	List<Student> findByNameIgnoreCaseContaining(String name);
 
 }
