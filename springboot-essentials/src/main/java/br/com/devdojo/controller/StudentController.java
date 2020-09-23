@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.devdojo.error.CustomErrorType;
+import br.com.devdojo.error.ResourceNotFoundException;
 import br.com.devdojo.model.Student;
 import br.com.devdojo.repository.StudentRepository;
 
@@ -30,10 +30,8 @@ public class StudentController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<?> getStudentById(@PathVariable("id") Long id) {
+		verifyIfStudentExists(id);
 		Student student = studentDao.findById(id).get();
-		if (student == null) {
-			return new ResponseEntity<>(new CustomErrorType("Student not found"), HttpStatus.NOT_FOUND);
-		}
 		return new ResponseEntity<>(student, HttpStatus.OK);
 	}
 
@@ -50,14 +48,22 @@ public class StudentController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<?> delete(@PathVariable Long id) {
+		verifyIfStudentExists(id);
 		studentDao.deleteById(id);
 		return new ResponseEntity<>(HttpStatus.NO_CONTENT);
 	}
 
 	@PutMapping
 	public ResponseEntity<?> update(@RequestBody Student student) {
+		verifyIfStudentExists(student.getId());
 		studentDao.save(student);
 		return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+	}
+
+	private void verifyIfStudentExists(Long id) {
+		if (!studentDao.findById(id).isPresent()) {
+			throw new ResourceNotFoundException("Student not found for ID: " + id);
+		}
 	}
 
 }
