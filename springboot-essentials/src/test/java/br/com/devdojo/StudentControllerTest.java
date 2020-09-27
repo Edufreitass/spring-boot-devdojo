@@ -2,10 +2,11 @@ package br.com.devdojo;
 
 import br.com.devdojo.model.Student;
 import br.com.devdojo.repository.StudentRepository;
-import br.com.devdojo.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.assertj.core.api.Assertions;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.BDDMockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,36 +14,22 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.ResourceAccessException;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasSize;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.isA;
-import static org.mockito.Mockito.*;
 import static org.springframework.http.HttpMethod.DELETE;
-import static org.springframework.http.HttpMethod.PUT;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(SpringExtension.class)
+
+@RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 public class StudentControllerTest {
@@ -50,16 +37,14 @@ public class StudentControllerTest {
     @Autowired
     private TestRestTemplate restTemplate;
 
-    private MockRestServiceServer mockServer;
-
-    @Autowired
-    private MockMvc mockMvc;
+    @LocalServerPort
+    private int port;
 
     @MockBean
     private StudentRepository studentRepository;
 
-    @MockBean
-    private UserRepository userRepository;
+    @Autowired
+    private MockMvc mockMvc;
 
     @TestConfiguration
     static class Config {
@@ -69,189 +54,95 @@ public class StudentControllerTest {
         }
     }
 
-    @Test
-    public void whenListStudentUsingIncorrectUsernameAndPasswordThenReturnStatusCode401Unauthorized() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/", String.class);
-        assertThat(response.getStatusCodeValue()).isEqualTo(401);
-    }
-
-    @Test
-    public void whenGetStudentByIdUsingIncorrectUsernameAndPasswordThenReturnStatusCode401Unauthorized() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/1", String.class);
-        assertThat(response.getStatusCodeValue()).isEqualTo(401);
-    }
-
-    @Test
-    public void whenFindStudentByNameUsingIncorrectUsernameAndPasswordThenReturnStatusCode401Unauthorized() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/findByName/studentName", String.class);
-        assertThat(response.getStatusCodeValue()).isEqualTo(401);
-    }
-
-    @Test
-    public void whenSaveStudentUsingIncorrectUsernameAndPasswordThenReturnResourceAccessException() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-
+    @Before
+    public void setup() {
         Student student = new Student(1L, "Legolas", "legolas@lotr.com");
-
-        assertThrows(
-                ResourceAccessException.class,
-                () -> restTemplate.postForEntity("http://localhost:8080/v1/admin/students/", student, String.class));
+        BDDMockito.when(studentRepository.findById(student.getId())).thenReturn(java.util.Optional.of(student));
     }
 
     @Test
-    public void whenDeleteStudentUsingIncorrectUsernameAndPasswordThenReturnStatusCode401Unauthorized() {
+    public void listStudentsWhenUsernameAndPasswordAreIncorrectShouldReturnStatusCode401() {
+        System.out.println(port);
         restTemplate = restTemplate.withBasicAuth("1", "1");
-
-        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/{id}", DELETE, null, String.class, 1L);
-
-        assertThat(response.getStatusCodeValue()).isEqualTo(401);
+        ResponseEntity<String> response = restTemplate.getForEntity("/v1/protected/students/", String.class);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(401);
     }
 
     @Test
-    public void whenUpdateStudentUsingIncorrectUsernameAndPasswordThenReturnResourceAccessException() {
+    public void getStudentsByIdWhenUsernameAndPasswordAreIncorrectShouldReturnStatusCode401() {
+        System.out.println(port);
         restTemplate = restTemplate.withBasicAuth("1", "1");
-
-        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Student> entity = new HttpEntity<Student>(student, headers);
-
-        assertThrows(
-                ResourceAccessException.class,
-                () -> restTemplate.exchange("http://localhost:8080/v1/admin/students", PUT, entity, String.class, 1L));
+        ResponseEntity<String> response = restTemplate.getForEntity("/v1/protected/students/1", String.class);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(401);
     }
 
-
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenListAllStudentsUsingCorrectRoleThenReturnStatusCode200() throws Exception {
+    public void listStudentsWhenUsernameAndPasswordAreCorrectShouldReturnStatusCode200() {
         List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
                 new Student(2L, "Aragorn", "aragorn@lotr.com"));
-
-        Page<Student> pagedStudents = new PageImpl(students);
-
-        when(studentRepository.findAll(isA(Pageable.class))).thenReturn(pagedStudents);
-
-        mockMvc.perform(get("http://localhost:8080/v1/protected/students/"))
-                .andExpect(status().isOk())
-                .andDo(print());
-
-        verify(studentRepository).findAll(isA(Pageable.class));
+        restTemplate = restTemplate.withBasicAuth("1", "1");
+        BDDMockito.when(studentRepository.findAll()).thenReturn(students);
+        ResponseEntity<String> response = restTemplate.getForEntity("/v1/protected/students/", String.class);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(200);
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenGetStudentByIdUsingCorrectRoleAndStudentDoesntExistThenReturnStatusCode404() throws Exception {
-        Student student = new Student(3L, "Legolas", "legolas@lotr.com");
-
-        when(studentRepository.findById(3L)).thenReturn(java.util.Optional.of(student));
-
-        mockMvc.perform(get("http://localhost:8080/v1/protected/students/{id}", 6))
-                .andExpect(status().isNotFound())
-                .andDo(print());
-
-        verify(studentRepository).findById(6L);
+    public void getStudentsByIdWhenUsernameAndPasswordAreCorrectShouldReturnStatusCode200() {
+        ResponseEntity<Student> response = restTemplate.getForEntity("/v1/protected/students/{id}", Student.class, 1L);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(200);
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenFindStudentsByNameUsingCorrectRoleThenReturnStatusCode200() throws Exception {
-        List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
-                new Student(2L, "Aragorn", "aragorn@lotr.com"),
-                new Student(3L, "legolas greenleaf", "legolas.gl@lotr.com"));
-
-        when(studentRepository.findByNameIgnoreCaseContaining("legolas")).thenReturn(students);
-
-        mockMvc.perform(get("http://localhost:8080/v1/protected/students/findByName/legolas"))
-                .andExpect(status().isOk())
-                .andDo(print());
-
-        verify(studentRepository).findByNameIgnoreCaseContaining("legolas");
+    public void getStudentsByIdWhenUsernameAndPasswordAreCorrectAndStudentDoesNotExistShouldReturnStatusCode404() {
+        ResponseEntity<Student> response = restTemplate.getForEntity("/v1/protected/students/{id}", Student.class, -1);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(404);
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenDeleteUsingCorrectRoleThenReturnStatusCode204() throws Exception {
-
-        Student student = new Student(3L, "Legolas", "legolas@lotr.com");
-
-        when(studentRepository.findById(3L)).thenReturn(java.util.Optional.of(student));
-
-        doNothing().when(studentRepository).deleteById(3L);
-
-        mockMvc.perform(delete("http://localhost:8080/v1/admin/students/{id}", 3))
-                .andExpect(status().isNoContent())
-                .andDo(print());
-
-        verify(studentRepository).deleteById(3L);
+    public void deleteWhenUserHasRoleAdminAndStudentExistsShouldReturnStatusCode200() {
+        BDDMockito.doNothing().when(studentRepository).deleteById(1L);
+        ResponseEntity<String> exchange = restTemplate.exchange("/v1/admin/students/{id}", DELETE, null, String.class, 1L);
+        Assertions.assertThat(exchange.getStatusCodeValue()).isEqualTo(200);
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenDeleteHasRoleAdminAndStudentDontExistThenReturnStatusCode404() throws Exception {
-
-        doNothing().when(studentRepository).deleteById(1L);
-
-        mockMvc.perform(delete("http://localhost:8080/v1/admin/students/{id}", 1))
-                .andExpect(status().isNotFound())
-                .andDo(print());
-
-        verify(studentRepository, atLeast(1)).findById(1L);
+    @WithMockUser(username = "xx", password = "xx", roles = {"USER", "ADMIN"})
+    public void deleteWhenUserHasRoleAdminAndStudentDoesNotExistShouldReturnStatusCode404() throws Exception {
+        BDDMockito.doNothing().when(studentRepository).deleteById(1L);
+//        ResponseEntity<String> exchange = restTemplate.exchange("/v1/admin/students/{id}", DELETE, null, String.class, -1L);
+//        Assertions.assertThat(exchange.getStatusCodeValue()).isEqualTo(404);
+        mockMvc.perform(MockMvcRequestBuilders
+                .delete("/v1/admin/students/{id}", -1L))
+                .andExpect(MockMvcResultMatchers.status().isNotFound());
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenDeleteHasRoleUserThenReturnStatusCode403() throws Exception {
-        doNothing().when(studentRepository).deleteById(1L);
-
-        mockMvc.perform(delete("http://localhost:8080/v1/admin/students/{id}", 1))
-                .andExpect(status().isForbidden())
-                .andDo(print());
+    @WithMockUser(username = "xx", password = "xx", roles = {"USER"})
+    public void deleteWhenUserDoesNotHaveRoleAdminShouldReturnStatusCode403() throws Exception {
+        BDDMockito.doNothing().when(studentRepository).deleteById(1L);
+//        ResponseEntity<String> exchange = restTemplate.exchange("/v1/admin/students/{id}", DELETE, null, String.class, -1L);
+//        Assertions.assertThat(exchange.getStatusCodeValue()).isEqualTo(404);
+        mockMvc.perform(MockMvcRequestBuilders
+                .delete("/v1/admin/students/{id}", -1L))
+                .andExpect(MockMvcResultMatchers.status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenSaveHasRoleAdminAndStudentIsNullThenReturnStatusCode400() throws Exception {
-
-        Student student = new Student(3L, "", "legolas@lotr.com");
-
-        when(studentRepository.save(student)).thenReturn(student);
-
-        ObjectMapper mapper = new ObjectMapper();
-        String jsonString = mapper.writeValueAsString(student);
-
-
-        mockMvc.perform(post("http://localhost:8080/v1/admin/students/").contentType(MediaType.APPLICATION_JSON).content(jsonString))
-                .andExpect(status().isBadRequest())
-                .andDo(print());
+    public void createWhenNameIsNullShouldReturnStatusCode400BadRequest() throws Exception {
+        Student student = new Student(3L, null, "sam@lotr.com");
+        BDDMockito.when(studentRepository.save(student)).thenReturn(student);
+        ResponseEntity<String> response = restTemplate.postForEntity("/v1/admin/students/", student, String.class);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(400);
+        Assertions.assertThat(response.getBody()).contains("fieldMessage", "O campo nome do estudante é obrigatório");
     }
 
-
     @Test
-    @WithMockUser(username = "xx", password = "xx", roles = "USER")
-    public void whenListAllStudentsUsingCorrectRoleThenReturnCorrectData() throws Exception {
-        List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
-                new Student(2L, "Aragorn", "aragorn@lotr.com"));
-
-        Page<Student> pagedStudents = new PageImpl(students);
-
-        when(studentRepository.findAll(isA(Pageable.class))).thenReturn(pagedStudents);
-
-        mockMvc.perform(get("http://localhost:8080/v1/protected/students/"))
-                .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id").value("1"))
-                .andExpect(jsonPath("$.content[0].name").value("Legolas"))
-                .andExpect(jsonPath("$.content[0].email").value("legolas@lotr.com"))
-                .andExpect(jsonPath("$.content[1].id").value("2"))
-                .andExpect(jsonPath("$.content[1].name").value("Aragorn"))
-                .andExpect(jsonPath("$.content[1].email").value("aragorn@lotr.com"));
-
-        verify(studentRepository).findAll(isA(Pageable.class));
+    public void createShouldPersistDataAndReturnStatusCode201() throws Exception {
+        Student student = new Student(3L, "Sam", "sam@lotr.com");
+        BDDMockito.when(studentRepository.save(student)).thenReturn(student);
+        ResponseEntity<Student> response = restTemplate.postForEntity("/v1/admin/students/", student, Student.class);
+        Assertions.assertThat(response.getStatusCodeValue()).isEqualTo(201);
+        Assertions.assertThat(response.getBody().getId()).isNotNull();
     }
 
 }
