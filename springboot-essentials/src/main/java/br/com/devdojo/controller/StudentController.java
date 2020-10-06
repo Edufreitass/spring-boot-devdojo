@@ -22,7 +22,7 @@ public class StudentController {
     @Autowired
     private StudentRepository studentDao;
 
-    @GetMapping("/protected/students")
+    @GetMapping("/admin/students")
     public ResponseEntity<?> listAll(Pageable pageable) {
         return new ResponseEntity<>(studentDao.findAll(pageable), HttpStatus.OK);
     }
