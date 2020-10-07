@@ -4,16 +4,16 @@ import br.com.devdojo.model.Student;
 import br.com.devdojo.repository.StudentRepository;
 import br.com.devdojo.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.context.annotation.Bean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -25,18 +25,15 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.ResourceAccessException;
 
 import java.util.List;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.*;
-import static org.springframework.http.HttpMethod.DELETE;
-import static org.springframework.http.HttpMethod.PUT;
+import static org.springframework.http.HttpMethod.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-public class StudentControllerTest {
+public class StudentControllerTokenTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -61,77 +58,167 @@ public class StudentControllerTest {
     @MockBean
     private UserRepository userRepository;
 
-    @TestConfiguration
-    static class Config {
-        @Bean
-        public RestTemplateBuilder restTemplateBuilder() {
-            return new RestTemplateBuilder().basicAuthentication("toyo", "devdojo");
-        }
+    private HttpEntity<Void> protectedHeader;
+    private HttpEntity<Student> adminHeader;
+    private HttpEntity<Void> wrongHeader;
+
+    @BeforeEach
+    public void configProtectedHeaders() {
+
+        String str = "{\"username\": \"oda\", \"password\": \"devdojo\"}";
+
+        HttpHeaders headers = restTemplate.postForEntity("http://localhost:8080/login", str, String.class).getHeaders();
+
+        this.protectedHeader = new HttpEntity<>(headers);
     }
 
+    @BeforeEach
+    public void configAdminHeaders() {
+        String str = "{\"username\": \"toyo\", \"password\": \"devdojo\"}";
+        HttpHeaders headers = restTemplate.postForEntity("http://localhost:8080/login", str, String.class).getHeaders();
+        this.adminHeader = new HttpEntity<>(headers);
+    }
+
+    @BeforeEach
+    public void configWrongHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Authorization", "11111");
+        this.wrongHeader = new HttpEntity<>(headers);
+    }
+
+    @BeforeEach
+    public void setup() {
+        Student student = new Student(3L, "Legolas", "legolas@lotr.com");
+
+        when(studentRepository.findById(3L)).thenReturn(java.util.Optional.of(student));
+    }
+
+
     @Test
-    public void whenListStudentUsingIncorrectUsernameAndPasswordThenReturnStatusCode403Forbidden() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/", String.class);
+    public void whenListStudentUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/protected/students/", GET, wrongHeader, String.class);
         assertThat(response.getStatusCodeValue()).isEqualTo(403);
     }
 
     @Test
-    public void whenGetStudentByIdUsingIncorrectUsernameAndPasswordThenReturnStatusCode403Forbidden() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/1", String.class);
+    public void whenGetStudentByIdUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/protected/students/1", GET, wrongHeader, String.class);
         assertThat(response.getStatusCodeValue()).isEqualTo(403);
     }
 
     @Test
-    public void whenFindStudentByNameUsingIncorrectUsernameAndPasswordThenReturnStatusCode403Forbidden() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:8080/v1/protected/students/findByName/studentName", String.class);
-        assertThat(response.getStatusCodeValue()).isEqualTo(403);
+    public void whenListStudentUsingCorrectToken_thenReturnStatusCode200OK() {
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/protected/students/", GET, protectedHeader, String.class);
+        assertThat(response.getStatusCodeValue()).isEqualTo(200);
     }
-
-    // EXCEPTION: org.opentest4j.AssertionFailedError: Expected org.springframework.web.client.ResourceAccessException to be thrown, but nothing was thrown.
-//    @Test
-//    public void whenSaveStudentUsingIncorrectUsernameAndPasswordThenReturnResourceAccessException() {
-//        restTemplate = restTemplate.withBasicAuth("1", "1");
-//
-//        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
-//
-//        assertThrows(
-//                ResourceAccessException.class,
-//                () -> restTemplate.postForEntity("http://localhost:8080/v1/admin/students/", student, String.class));
-//    }
 
     @Test
-    public void whenDeleteStudentUsingIncorrectUsernameAndPasswordThenReturnStatusCode403Forbidden() {
-        restTemplate = restTemplate.withBasicAuth("1", "1");
+    public void whenFindStudentByNameUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/protected/students/findByName/Maria", GET, wrongHeader, String.class);
+        assertThat(response.getStatusCodeValue()).isEqualTo(403);
+    }
 
-        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/{id}", DELETE, null, String.class, 1L);
+    @Test
+    public void whenGetStudentByIdUsingCorrectTokenAndStudentDontExist_thenReturnStatusCode404NotFound() {
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/protected/students/-1", GET, protectedHeader, String.class);
+        assertThat(response.getStatusCodeValue()).isEqualTo(404);
+    }
+
+    @Test
+    public void whenSaveStudentUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/", POST, wrongHeader, String.class);
+
 
         assertThat(response.getStatusCodeValue()).isEqualTo(403);
     }
 
-    // EXCEPTION: org.opentest4j.AssertionFailedError: Expected org.springframework.web.client.ResourceAccessException to be thrown, but nothing was thrown.
-//    @Test
-//    public void whenUpdateStudentUsingIncorrectUsernameAndPasswordThenReturnResourceAccessException() {
-//        restTemplate = restTemplate.withBasicAuth("1", "1");
-//
-//        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
-//
-//        HttpHeaders headers = new HttpHeaders();
-//        headers.setContentType(MediaType.APPLICATION_JSON);
-//
-//        HttpEntity<Student> entity = new HttpEntity<Student>(student, headers);
-//
-//        assertThrows(
-//                ResourceAccessException.class,
-//                () -> restTemplate.exchange("http://localhost:8080/v1/admin/students", PUT, entity, String.class, 1L));
-//    }
+    @Test
+    public void whenSaveStudentUsingCorrectToken_thenReturn201Created() {
+        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/", POST, adminHeader, String.class);
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(201);
+    }
+
+    @Test
+    public void whenDeleteStudentUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/{id}", DELETE, wrongHeader, String.class, 1L);
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(403);
+    }
+
+    @Test
+    public void whenDeleteStudentUsingCorrectToken_thenReturnStatusCode200Ok() throws JSONException {
+        Student student = new Student("Legolas", "legolas@lotr.com");
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+        ResponseEntity<String> response1 = restTemplate.exchange("http://localhost:8080/v1/admin/students/", POST, adminHeader, String.class);
+
+        JSONObject studentJson = new JSONObject(response1.getBody());
+
+        doNothing().when(studentRepository).deleteById(studentJson.getLong("id"));
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/{id}", DELETE, adminHeader, String.class, studentJson.getLong("id"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(200);
+    }
+
+    @Test
+    public void whenUpdateStudentUsingCorrectToken_thenReturnStatusCode200Ok() throws JSONException {
+
+        Student student = new Student(999L, "Legolas", "legolas@lotr.com");
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+        ResponseEntity<String> response1 = restTemplate.exchange("http://localhost:8080/v1/admin/students/", POST, adminHeader, String.class);
+
+        JSONObject studentJson = new JSONObject(response1.getBody());
+
+        doNothing().when(studentRepository).deleteById(studentJson.getLong("id"));
+
+        student = new Student(studentJson.getLong("id"), "Legolas", "legolas@lotr.com");
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+        restTemplate.exchange("http://localhost:8080/v1/admin/students/", POST, adminHeader, String.class);
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/", PUT, adminHeader, String.class);
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(200);
+    }
+
+    @Test
+    public void whenUpdateStudentUsingIncorrectToken_thenReturnStatusCode403Forbidden() {
+
+
+        Student student = new Student(1L, "Legolas", "legolas@lotr.com");
+
+        studentRepository.save(student);
+
+        adminHeader = new HttpEntity<>(student, adminHeader.getHeaders());
+
+        ResponseEntity<String> response = restTemplate.exchange("http://localhost:8080/v1/admin/students/", PUT, wrongHeader, String.class);
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(403);
+    }
 
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenListAllStudentsUsingCorrectRoleThenReturnStatusCode200() throws Exception {
+    public void whenListAllStudentsUsingCorrectRole_thenReturnStatusCode200() throws Exception {
         List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
                 new Student(2L, "Aragorn", "aragorn@lotr.com"));
 
@@ -148,7 +235,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenGetStudentByIdUsingCorrectRoleAndStudentDoesntExistThenReturnStatusCode404() throws Exception {
+    public void whenGetStudentByIdUsingCorrectRoleAndStudentDoesntExist_thenReturnStatusCode404() throws Exception {
         Student student = new Student(3L, "Legolas", "legolas@lotr.com");
 
         when(studentRepository.findById(3L)).thenReturn(java.util.Optional.of(student));
@@ -162,7 +249,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenFindStudentsByNameUsingCorrectRoleThenReturnStatusCode200() throws Exception {
+    public void whenFindStudentsByNameUsingCorrectRole_thenReturnStatusCode200() throws Exception {
         List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
                 new Student(2L, "Aragorn", "aragorn@lotr.com"),
                 new Student(3L, "legolas greenleaf", "legolas.gl@lotr.com"));
@@ -178,7 +265,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenDeleteUsingCorrectRoleThenReturnStatusCode200() throws Exception {
+    public void whenDeleteUsingCorrectRole_thenReturnStatusCode200() throws Exception {
 
         Student student = new Student(3L, "Legolas", "legolas@lotr.com");
 
@@ -195,7 +282,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenDeleteHasRoleAdminAndStudentDontExistThenReturnStatusCode404() throws Exception {
+    public void whenDeleteHasRoleAdminAndStudentDontExist_thenReturnStatusCode404() throws Exception {
 
         doNothing().when(studentRepository).deleteById(1L);
 
@@ -208,7 +295,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"USER"})
-    public void whenDeleteHasRoleUserThenReturnStatusCode403() throws Exception {
+    public void whenDeleteHasRoleUser_thenReturnStatusCode403() throws Exception {
         doNothing().when(studentRepository).deleteById(1L);
 
         mockMvc.perform(delete("http://localhost:8080/v1/admin/students/{id}", 1))
@@ -218,7 +305,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xxx", password = "xxx", roles = {"ADMIN"})
-    public void whenSaveHasRoleAdminAndStudentIsNullThenReturnStatusCode400() throws Exception {
+    public void whenSaveHasRoleAdminAndStudentIsNull_thenReturnStatusCode400() throws Exception {
 
         Student student = new Student(3L, "", "legolas@lotr.com");
 
@@ -236,7 +323,7 @@ public class StudentControllerTest {
 
     @Test
     @WithMockUser(username = "xx", password = "xx", roles = "USER")
-    public void whenListAllStudentsUsingCorrectRoleThenReturnCorrectData() throws Exception {
+    public void whenListAllStudentsUsingCorrectRole_thenReturnCorrectData() throws Exception {
         List<Student> students = asList(new Student(1L, "Legolas", "legolas@lotr.com"),
                 new Student(2L, "Aragorn", "aragorn@lotr.com"));
 
